@@ -95,6 +95,36 @@ namespace GetEventstoreExploratoryTests
         }
 
         [Fact]
+        public async Task Can_append_previously_appended_messages_with_expected_result_for_next_expected_version()
+        {
+            await _node.StartAndWaitUntilInitialized();
+
+            using (var connection = EmbeddedEventStoreConnection.Create(_node, _connectionSettingsBuilder))
+            {
+                string streamId = "stream-1";
+                var eventData1 = new EventData(Guid.NewGuid(), "type", false, null, null);
+                var eventData2 = new EventData(Guid.NewGuid(), "type", false, null, null);
+                var eventData3 = new EventData(Guid.NewGuid(), "type", false, null, null);
+                var eventData4 = new EventData(Guid.NewGuid(), "type", false, null, null);
+
+                var appendResult = await connection.AppendToStreamAsync(streamId, ExpectedVersion.NoStream, eventData1, eventData2, eventData3, eventData4);
+                appendResult.NextExpectedVersion.ShouldBe(3);
+
+                var appendResult1 = await connection.AppendToStreamAsync(streamId, 0, eventData2);
+                appendResult1.NextExpectedVersion.ShouldBe(1);
+
+                var appendResult2 = await connection.AppendToStreamAsync(streamId, 1, eventData3);
+                appendResult2.NextExpectedVersion.ShouldBe(2);
+
+                var appendResult3 = await connection.AppendToStreamAsync(streamId, 0, eventData2, eventData3);
+                appendResult3.NextExpectedVersion.ShouldBe(2);
+
+                var appendResult4 = await connection.AppendToStreamAsync(streamId, ExpectedVersion.NoStream, eventData1, eventData2, eventData3);
+                appendResult4.NextExpectedVersion.ShouldBe(2);
+            }
+        }
+
+        [Fact]
         public async Task Catchup_subscription()
         {
             await _node.StartAndWaitUntilInitialized();
